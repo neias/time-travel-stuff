@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Karakter — Drag & Drop</title>
+  <style>
+    :root {
+      --ground: 78%;
+      --char-w: 180px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
+      color: #f5f5f5;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background:
+        radial-gradient(1200px 600px at 50% 120%, #2a3a5c 0%, #0f1629 55%, #060a16 100%);
+      position: relative;
+    }
+
+    .stage {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .ground {
+      position: absolute;
+      left: 0; right: 0;
+      top: var(--ground);
+      bottom: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0) 100%),
+        repeating-linear-gradient(
+          90deg,
+          #2c3b28 0 32px,
+          #33432f 32px 64px
+        );
+      border-top: 3px solid #556b4a;
+      box-shadow: 0 -30px 80px rgba(0,0,0,0.45) inset;
+    }
+
+    .hint {
+      position: absolute;
+      top: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      letter-spacing: 0.02em;
+      opacity: 0.85;
+    }
+    .hint h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .hint p {
+      font-size: 13px;
+      color: #9fb0c9;
+    }
+
+    .character {
+      position: absolute;
+      width: var(--char-w);
+      height: calc(var(--char-w) * 1.28);
+      left: 50%;
+      top: calc(var(--ground) - (var(--char-w) * 1.28) + 14px);
+      transform: translateX(-50%);
+      will-change: transform, left, top;
+      filter: drop-shadow(0 14px 14px rgba(0,0,0,0.35));
+      transition: filter 0.2s ease;
+      pointer-events: none;
+    }
+
+    /* Sadece kafa + omuz bölgesi tutulabilir */
+    .grab-handle {
+      position: absolute;
+      top: 6%;
+      left: 18%;
+      right: 18%;
+      height: 32%;
+      cursor: grab;
+      pointer-events: auto;
+      z-index: 3;
+    }
+    .character.dragging .grab-handle { cursor: grabbing; }
+    .character.falling  .grab-handle { cursor: default; pointer-events: none; }
+
+    /* Konuşma balonu */
+    .bubble {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      transform: translate(-50%, calc(-100% - 4px)) scale(0.6);
+      background: #fff;
+      color: #111;
+      border: 3px solid #111;
+      padding: 8px 16px;
+      font: 700 15px/1 -apple-system, "SF Pro Text", system-ui, sans-serif;
+      letter-spacing: 0.02em;
+      border-radius: 14px;
+      white-space: nowrap;
+      box-shadow: 3px 3px 0 #111;
+      pointer-events: none;
+      opacity: 0;
+      transform-origin: 50% 100%;
+      transition: opacity 0.18s ease, transform 0.28s cubic-bezier(.34,1.56,.64,1);
+      z-index: 4;
+    }
+    .bubble::before,
+    .bubble::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      width: 0; height: 0;
+      transform: translateX(-50%);
+    }
+    /* siyah kuyruk (outline) */
+    .bubble::after {
+      bottom: -12px;
+      border: 7px solid transparent;
+      border-top-color: #111;
+    }
+    /* beyaz kuyruk iç dolgusu */
+    .bubble::before {
+      bottom: -7px;
+      border: 5px solid transparent;
+      border-top-color: #fff;
+      z-index: 1;
+    }
+    .bubble.visible {
+      opacity: 1;
+      transform: translate(-50%, calc(-100% - 4px)) scale(1);
+    }
+    /* drag veya düşüş sırasında gizle */
+    .character.dragging .bubble,
+    .character.falling  .bubble {
+      opacity: 0 !important;
+      transition: opacity 0.1s;
+    }
+
+    .character img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      pointer-events: none;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      opacity: 0;
+      position: absolute;
+      inset: 0;
+      transition: opacity 0.08s linear;
+    }
+    .character img.active { opacity: 1; }
+
+    /* fall/land sprite'larında bacaklar bükülü — ayakları zemine hizala */
+    .character img#spr-fall.active,
+    .character img#spr-land.active {
+      transform: translateY(22px);
+    }
+
+    /* 010 sprite'ı diğer idle sprite'larından 2-3 px küçük — ayaktan büyüt */
+    .character img#spr-idle {
+      transform-origin: 50% 100%;
+    }
+    .character img#spr-idle.active {
+      transform: scale(1.018);
+    }
+
+    /* küçük dangling animation sürüklerken */
+    .character.dragging {
+      animation: dangle 0.9s ease-in-out infinite alternate;
+      transform-origin: 50% 20%;
+    }
+    @keyframes dangle {
+      from { transform: rotate(-3deg); }
+      to   { transform: rotate(3deg);  }
+    }
+
+    /* Yere çarpma sarsıntısı */
+    .stage.shake {
+      animation: shake 0.35s cubic-bezier(.36,.07,.19,.97);
+    }
+    @keyframes shake {
+      10%, 90% { transform: translate3d(-1px, 0, 0); }
+      20%, 80% { transform: translate3d(2px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+      40%, 60% { transform: translate3d(4px, 0, 0); }
+    }
+
+    /* Toz bulutları */
+    .dust {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #e9d7b3 0%, #b39970 70%, rgba(179,153,112,0) 100%);
+      pointer-events: none;
+      opacity: 0;
+    }
+    .dust.pop {
+      animation: dustPop 0.7s ease-out forwards;
+    }
+    @keyframes dustPop {
+      0%   { opacity: 0.85; transform: translate(0,0) scale(0.3); }
+      100% { opacity: 0;    transform: translate(var(--dx), var(--dy)) scale(1.4); }
+    }
+
+    .platform {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      padding: 18px 40px;
+      font: 600 16px/1 -apple-system, "SF Pro Text", system-ui, sans-serif;
+      letter-spacing: 0.04em;
+      color: #fff;
+      background: linear-gradient(180deg, #4f7cff 0%, #2e54d9 100%);
+      border: none;
+      border-radius: 14px;
+      box-shadow:
+        0 6px 0 #1b3ba8,
+        0 10px 30px rgba(30, 60, 160, 0.45),
+        inset 0 1px 0 rgba(255,255,255,0.3);
+      cursor: pointer;
+      z-index: 1;
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+    }
+    .platform:hover { transform: translate(-50%, calc(-50% - 1px)); }
+    .platform:active {
+      transform: translate(-50%, calc(-50% + 3px));
+      box-shadow:
+        0 3px 0 #1b3ba8,
+        0 5px 15px rgba(30, 60, 160, 0.35),
+        inset 0 1px 0 rgba(255,255,255,0.3);
+    }
+    .platform.pos-left  { left: 22%; top: 58%; }
+    .platform.pos-mid   { left: 50%; top: 52%; }
+    .platform.pos-right { left: 78%; top: 64%; }
+
+    .platform.variant-pink {
+      background: linear-gradient(180deg, #ff7ab8 0%, #d84a92 100%);
+      box-shadow:
+        0 6px 0 #9a2d6a,
+        0 10px 30px rgba(200, 60, 130, 0.45),
+        inset 0 1px 0 rgba(255,255,255,0.3);
+    }
+    .platform.variant-green {
+      background: linear-gradient(180deg, #4cd68a 0%, #1ea85d 100%);
+      box-shadow:
+        0 6px 0 #116a3a,
+        0 10px 30px rgba(40, 160, 90, 0.45),
+        inset 0 1px 0 rgba(255,255,255,0.3);
+    }
+
+    .platform.landed {
+      animation: platformPress 0.25s ease-out;
+    }
+    @keyframes platformPress {
+      0%   { transform: translate(-50%, -50%); }
+      40%  { transform: translate(-50%, calc(-50% + 4px)); }
+      100% { transform: translate(-50%, -50%); }
+    }
+
+    .character { z-index: 2; }
+
+    .footer {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      color: #7a8aa3;
+      letter-spacing: 0.04em;
+    }
+    kbd {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <div class="ground"></div>
+
+    <div class="hint">
+      <h1>Karakteri tut ve bırak</h1>
+      <p>Fareyle üzerine gel, tıklayıp sürükle, bırak — yer çeker.</p>
+    </div>
+
+    <button class="platform pos-left variant-pink"  type="button">BAŞLAT</button>
+    <button class="platform pos-mid"                 type="button">BENİ TUT</button>
+    <button class="platform pos-right variant-green" type="button">BIRAK</button>
+
+    <div class="character" id="char">
+      <div class="grab-handle" id="grab"></div>
+      <img id="spr-idle"     src="images/drag-drop/010.png"  alt="idle"     class="active" />
+      <img id="spr-hover"    src="images/drag-drop/0012.png" alt="hover" />
+      <img id="spr-drag"     src="images/drag-drop/020.png"  alt="drag" />
+      <img id="spr-fall"     src="images/drag-drop/030.png"  alt="fall" />
+      <img id="spr-land"     src="images/drag-drop/040.png"  alt="land" />
+      <img id="spr-breathe1" src="images/idle1/b010.png"     alt="breathe1" />
+      <img id="spr-breathe2" src="images/idle1/b011.png"     alt="breathe2" />
+      <img id="spr-look2"    src="images/idle1/b012.png"     alt="look2" />
+      <img id="spr-glasses"  src="images/idle1/b013.png"     alt="glasses" />
+      <img id="spr-look"     src="images/idle1/b020.png"     alt="look" />
+      <div class="bubble" id="bubble"></div>
+    </div>
+
+    <div class="footer">Basılı tut • Sürükle • Bırak</div>
+  </div>
+
+  <script>
+    (() => {
+      const stage     = document.getElementById('stage');
+      const char      = document.getElementById('char');
+      const grab      = document.getElementById('grab');
+      const bubble    = document.getElementById('bubble');
+      const platforms = () => document.querySelectorAll('.platform');
+      const sprites = {
+        idle:     document.getElementById('spr-idle'),
+        hover:    document.getElementById('spr-hover'),
+        drag:     document.getElementById('spr-drag'),
+        fall:     document.getElementById('spr-fall'),
+        land:     document.getElementById('spr-land'),
+        breathe1: document.getElementById('spr-breathe1'),
+        breathe2: document.getElementById('spr-breathe2'),
+        look:     document.getElementById('spr-look'),
+        look2:    document.getElementById('spr-look2'),
+        glasses:  document.getElementById('spr-glasses'),
+      };
+
+      const state = {
+        mode: 'idle',      // idle | hover | drag | fall | land
+        dragging: false,
+        vx: 0, vy: 0,
+        x: 0, y: 0,        // merkez koordinatı
+        w: 0, h: 0,
+        grabOffsetX: 0,
+        grabOffsetY: 0,
+        raf: null,
+      };
+
+      const GRAVITY   = 0.9;
+      const FRICTION  = 0.985;
+      const BOUNCE    = 0.28;
+      const MAX_V     = 40;
+      const REST_IMPACT = 10;   // bu hızın altındaki çarpmalar sekmeden dinlenir
+
+      function measure() {
+        const r = char.getBoundingClientRect();
+        state.w = r.width;
+        state.h = r.height;
+      }
+
+      function showSprite(key) {
+        Object.values(sprites).forEach(img => img.classList.remove('active'));
+        if (sprites[key]) sprites[key].classList.add('active');
+      }
+
+      function setMode(mode) {
+        if (state.mode === mode) return;
+        state.mode = mode;
+        showSprite(mode);
+
+        char.classList.toggle('dragging', mode === 'drag');
+        char.classList.toggle('falling',  mode === 'fall' || mode === 'land');
+
+        if (mode === 'idle') bumpActivity();
+        else stopIdleAnim(true);
+      }
+
+      // --- Idle animation ------------------------------------------------
+      const IDLE_POOL = ['breathe1', 'breathe2', 'look', 'look2', 'glasses'];
+      const IDLE_FRAME_MIN_MS = 700;
+      const IDLE_FRAME_MAX_MS = 1600;
+      const IDLE_WAIT_MIN_MS  = 1000;   // 1 sn
+      const IDLE_WAIT_MAX_MS  = 15000;  // 15 sn
+      let idleWaitTimer = null;
+      let idleFrameTimer = null;
+      let lastIdleKey = null;
+
+      function randInt(min, max) {
+        return Math.floor(min + Math.random() * (max - min + 1));
+      }
+      function pickIdleKey() {
+        // aynı sprite üst üste gelmesin
+        const pool = IDLE_POOL.filter(k => k !== lastIdleKey);
+        const key = pool[Math.floor(Math.random() * pool.length)];
+        lastIdleKey = key;
+        return key;
+      }
+
+      function runIdleMove() {
+        if (state.mode !== 'idle') return;
+        showSprite(pickIdleKey());
+        idleFrameTimer = setTimeout(() => {
+          if (state.mode !== 'idle') return;
+          showSprite('idle');
+          scheduleIdleMove();
+        }, randInt(IDLE_FRAME_MIN_MS, IDLE_FRAME_MAX_MS));
+      }
+
+      function scheduleIdleMove() {
+        if (idleWaitTimer) clearTimeout(idleWaitTimer);
+        const wait = randInt(IDLE_WAIT_MIN_MS, IDLE_WAIT_MAX_MS);
+        idleWaitTimer = setTimeout(runIdleMove, wait);
+      }
+
+      function stopIdleAnim(resetWait) {
+        if (idleFrameTimer) { clearTimeout(idleFrameTimer); idleFrameTimer = null; }
+        if (resetWait && idleWaitTimer) { clearTimeout(idleWaitTimer); idleWaitTimer = null; }
+        if (state.mode === 'idle') showSprite('idle');
+      }
+
+      function bumpActivity() {
+        stopIdleAnim(true);
+        lastIdleKey = null;
+        if (state.mode === 'idle') scheduleIdleMove();
+      }
+
+      function placeAbsolute(x, y) {
+        state.x = x;
+        state.y = y;
+        char.style.left = (x - state.w / 2) + 'px';
+        char.style.top  = (y - state.h / 2) + 'px';
+        char.style.transform = 'none'; // translateX(-50%) artık gerek yok
+      }
+
+      function initPosition() {
+        measure();
+        const W = window.innerWidth;
+        const H = window.innerHeight;
+        const groundY = H * 0.78;
+        placeAbsolute(W / 2, groundY - state.h / 2 + 14);
+      }
+
+      // --- Speech bubble
+      let speechTimer = null;
+      let lastSpeechAt = 0;
+      function showSpeech(text = 'Merhaba!', duration = 2400, cooldown = 3500) {
+        const now = Date.now();
+        if (now - lastSpeechAt < cooldown) return;
+        lastSpeechAt = now;
+        if (state.mode === 'drag' || state.mode === 'fall' || state.mode === 'land') return;
+        bubble.textContent = text;
+        bubble.classList.add('visible');
+        clearTimeout(speechTimer);
+        speechTimer = setTimeout(() => bubble.classList.remove('visible'), duration);
+      }
+
+      // --- Hover (sadece tutma alanında)
+      grab.addEventListener('mouseenter', () => {
+        bumpActivity();
+        if (state.mode === 'idle') setMode('hover');
+        showSpeech('Merhaba!');
+      });
+      document.addEventListener('pointerdown', bumpActivity);
+      document.addEventListener('pointerup',   bumpActivity);
+      grab.addEventListener('mouseleave', () => {
+        if (state.mode === 'hover') setMode('idle');
+      });
+
+      // --- Drag başlat (sadece tutma alanında)
+      grab.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        if (state.raf) { cancelAnimationFrame(state.raf); state.raf = null; }
+        measure();
+        state.dragging = true;
+        state.grabOffsetX = e.clientX - state.x;
+        state.grabOffsetY = e.clientY - state.y;
+        setMode('drag');
+      });
+
+      // --- Sürükleme & hız takibi
+      let lastX = 0, lastY = 0, lastT = 0;
+      window.addEventListener('mousemove', (e) => {
+        if (!state.dragging) return;
+        const nx = e.clientX - state.grabOffsetX;
+        const ny = e.clientY - state.grabOffsetY;
+
+        const now = performance.now();
+        const dt = Math.max(1, now - lastT);
+        state.vx = ((nx - lastX) / dt) * 16; // ~frame bazlı
+        state.vy = ((ny - lastY) / dt) * 16;
+        lastX = nx; lastY = ny; lastT = now;
+
+        placeAbsolute(nx, ny);
+      });
+
+      // --- Bırak → düşüş
+      window.addEventListener('mouseup', () => {
+        if (!state.dragging) return;
+        state.dragging = false;
+        // hız cap
+        state.vx = Math.max(-MAX_V, Math.min(MAX_V, state.vx));
+        state.vy = Math.max(-MAX_V, Math.min(MAX_V, state.vy));
+        setMode('fall');
+        startPhysics();
+      });
+
+      function getPlatformList() {
+        return [...platforms()].map(el => {
+          const r = el.getBoundingClientRect();
+          return { el, left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+        });
+      }
+
+      function startPhysics() {
+        const step = () => {
+          const W = window.innerWidth;
+          const H = window.innerHeight;
+          const groundY = H * 0.78;
+
+          state.vy += GRAVITY;
+          state.vx *= FRICTION;
+
+          const prevBottom = state.y + state.h / 2;
+          let nx = state.x + state.vx;
+          let ny = state.y + state.vy;
+
+          // duvar çarpma
+          const halfW = state.w / 2;
+          if (nx - halfW < 0) { nx = halfW; state.vx *= -BOUNCE; }
+          if (nx + halfW > W) { nx = W - halfW; state.vx *= -BOUNCE; }
+
+          // platform(lar) — sadece üstten (yukarıdan aşağıya düşerken) yakalar
+          const newBottom = ny + state.h / 2;
+          if (state.vy > 0) {
+            for (const plat of getPlatformList()) {
+              const overlapX   = (nx > plat.left) && (nx < plat.right);
+              const crossedTop = (prevBottom <= plat.top + 2) && (newBottom >= plat.top);
+              if (overlapX && crossedTop) {
+                ny = plat.top - state.h / 2 + 14;
+                const impact = Math.abs(state.vy);
+                state.vx *= 0.5;
+                state.vy = 0;
+                placeAbsolute(nx, ny);
+                plat.el.classList.remove('landed');
+                void plat.el.offsetWidth;
+                plat.el.classList.add('landed');
+                spawnDust(nx - 20, plat.top, Math.min(1, impact / 25));
+                spawnDust(nx + 20, plat.top, Math.min(1, impact / 25));
+                landAndRest(impact);
+                return;
+              }
+            }
+          }
+
+          // zemin
+          const floorCenterY = groundY - state.h / 2 + 14;
+          if (ny >= floorCenterY) {
+            ny = floorCenterY;
+            const impact = Math.abs(state.vy);
+            state.vy *= -BOUNCE;
+            state.vx *= 0.6;
+
+            if (impact < REST_IMPACT) {
+              state.vx = 0; state.vy = 0;
+              placeAbsolute(nx, ny);
+              landAndRest(impact);
+              return;
+            } else {
+              spawnDust(nx, groundY, Math.min(1, impact / 25));
+              setMode('land');
+              setTimeout(() => { if (state.mode === 'land') setMode('fall'); }, 120);
+            }
+          }
+
+          placeAbsolute(nx, ny);
+          state.raf = requestAnimationFrame(step);
+        };
+        state.raf = requestAnimationFrame(step);
+      }
+
+      function landAndRest(impact) {
+        setMode('land');
+        spawnDust(state.x, window.innerHeight * 0.78, 1);
+        stage.classList.remove('shake');
+        // reflow tetikle
+        void stage.offsetWidth;
+        stage.classList.add('shake');
+
+        // biraz bekle, sonra idle'a dön
+        setTimeout(() => {
+          setMode('idle');
+          char.style.transform = 'none';
+        }, 650);
+      }
+
+      function spawnDust(x, y, intensity) {
+        const count = 6 + Math.floor(intensity * 8);
+        for (let i = 0; i < count; i++) {
+          const d = document.createElement('div');
+          d.className = 'dust';
+          const size = 10 + Math.random() * 20 * intensity;
+          d.style.width  = size + 'px';
+          d.style.height = size + 'px';
+          d.style.left = (x - size / 2) + 'px';
+          d.style.top  = (y - size / 2) + 'px';
+          const angle = (-Math.PI) * (0.15 + Math.random() * 0.7); // üst yarı küre
+          const speed = 40 + Math.random() * 120 * intensity;
+          d.style.setProperty('--dx', Math.cos(angle) * speed + 'px');
+          d.style.setProperty('--dy', Math.sin(angle) * speed + 'px');
+          stage.appendChild(d);
+          requestAnimationFrame(() => d.classList.add('pop'));
+          setTimeout(() => d.remove(), 750);
+        }
+      }
+
+      // İlk konumlanma — görseller yüklenene kadar bekle
+      const imgs = Object.values(sprites);
+      let loaded = 0;
+      imgs.forEach(img => {
+        if (img.complete) { loaded++; }
+        else img.addEventListener('load', () => { if (++loaded === imgs.length) initPosition(); });
+      });
+      if (loaded === imgs.length) initPosition();
+
+      bumpActivity();
+      setTimeout(() => showSpeech('Merhaba!', 2800, 0), 600);
+
+      window.addEventListener('resize', () => {
+        if (state.mode === 'idle' || state.mode === 'hover') initPosition();
+      });
+    })();
+  </script>
+</body>
+</html>

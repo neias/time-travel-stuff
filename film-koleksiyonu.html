@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Film Koleksiyonu</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0d;
+    --surface: #141414;
+    --border: #222;
+    --accent: #c8a96e;
+    --accent-dim: rgba(200,169,110,0.12);
+    --text: #e8e2d9;
+    --text-muted: #666;
+    --hover: #1a1a1a;
+    --stripe: #111;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+    padding: 48px 32px;
+  }
+
+  header {
+    max-width: 1100px;
+    margin: 0 auto 48px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .title-block h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .title-block p {
+    color: var(--text-muted);
+    margin-top: 6px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  input[type="search"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 8px 14px;
+    outline: none;
+    width: 220px;
+    letter-spacing: 0.03em;
+    transition: border-color 0.2s;
+  }
+
+  input[type="search"]:focus { border-color: var(--accent); }
+  input[type="search"]::placeholder { color: var(--text-muted); }
+
+  .count {
+    color: var(--text-muted);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .count span { color: var(--accent); }
+
+  .table-wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead tr {
+    border-bottom: 2px solid var(--accent);
+  }
+
+  th {
+    text-align: left;
+    padding: 10px 16px;
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+
+  th:hover { color: var(--text); }
+
+  th .sort-icon {
+    display: inline-block;
+    margin-left: 6px;
+    opacity: 0.3;
+    font-style: normal;
+  }
+
+  th.asc .sort-icon::after  { content: '↑'; opacity: 1; color: var(--accent); }
+  th.desc .sort-icon::after { content: '↓'; opacity: 1; color: var(--accent); }
+  th:not(.asc):not(.desc) .sort-icon::after { content: '↕'; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+
+  tbody tr:nth-child(odd)  { background: var(--stripe); }
+  tbody tr:nth-child(even) { background: var(--surface); }
+  tbody tr:hover { background: var(--accent-dim); }
+
+  td {
+    padding: 9px 16px;
+    line-height: 1.4;
+  }
+
+  td:first-child { color: var(--accent); width: 240px; }
+  td:nth-child(2) { color: var(--text); }
+  td:last-child { color: var(--text-muted); text-align: right; width: 80px; font-variant-numeric: tabular-nums; }
+
+  .no-results {
+    text-align: center;
+    padding: 48px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .correction-tag {
+    display: inline-block;
+    background: rgba(200,169,110,0.15);
+    color: var(--accent);
+    font-size: 9px;
+    padding: 1px 5px;
+    margin-left: 6px;
+    letter-spacing: 0.06em;
+    vertical-align: middle;
+    border: 1px solid rgba(200,169,110,0.3);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-block">
+    <h1>Film Koleksiyonu</h1>
+    <p>Yönetmen · Film · Yıl</p>
+  </div>
+  <div class="controls">
+    <input type="search" id="search" placeholder="Ara…" autocomplete="off">
+    <div class="count">Gösterilen: <span id="count">—</span></div>
+  </div>
+</header>
+
+<div class="table-wrap">
+  <table id="filmTable">
+    <thead>
+      <tr>
+        <th data-col="0">Yönetmen <i class="sort-icon"></i></th>
+        <th data-col="1">Film <i class="sort-icon"></i></th>
+        <th data-col="2">Yıl <i class="sort-icon"></i></th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="no-results" id="noResults" style="display:none">Sonuç bulunamadı.</div>
+</div>
+
+<script>
+const data = [
+  ["Abu-Assad, Hany","Paradise Now",2005],
+  ["Allen, Woody","Annie Hall",1977],
+  ["Allen, Woody","Match Point",2005],
+  ["Allen, Woody","Sleeper",1973],
+  ["Allen, Woody","Vicky Cristina Barcelona",2008],
+  ["Allen, Woody","Zelig",1983],
+  ["Almodóvar, Pedro","Hable con ella",2002],
+  ["Almodóvar, Pedro","La mala educación",2004],
+  ["Altman, Robert","Images",1972],
+  ["Altman, Robert","Short Cuts",1993],
+  ["Altman, Robert","That Cold Day in the Park",1969],
+  ["Amenábar, Alejandro","Mar adentro",2004],
+  ["Amenábar, Alejandro","The Others",2001],
+  ["Anderson, Lindsay","If…",1968],
+  ["Anderson, Paul Thomas","Magnolia",1999],
+  ["Anderson, Paul Thomas","There Will Be Blood",2007],
+  ["Anderson, Wes","Rushmore",1998],
+  ["Angelopoulos, Theo","Ekpombi",1968],
+  ["Angelopoulos, Theo","Lumière et compagnie",1995],
+  ["Angelopoulos, Theo","O Megalexandros",1980],
+  ["Angelopoulos, Theo","O Melissokomos",1986],
+  ["Angelopoulos, Theo","Meres tou '36",1972],
+  ["Angelopoulos, Theo","To Meteoro vima tou pelargou",1991],
+  ["Angelopoulos, Theo","Mia aioniotita kai mia mera",1998],
+  ["Angelopoulos, Theo","Taxidi sta Kythira",1984],
+  ["Angelopoulos, Theo","O Thiasos",1975],
+  ["Angelopoulos, Theo","Topio stin omichli",1988],
+  ["Angelopoulos, Theo","To Vlemma tou Odyssea",1995],
+  ["Antonioni, Michelangelo","Blowup",1966],
+  ["Antonioni, Michelangelo","Eros",2004],
+  ["Antonioni, Michelangelo","Il grido",1957],
+  ["Antonioni, Michelangelo","Zabriskie Point",1970],
+  ["Aramaki, Shinji","Appleseed",2004],
+  ["Argento, Asia","The Heart Is Deceitful Above All Things",2004],
+  ["Aronofsky, Darren","Pi",1998],
+  ["Aronofsky, Darren","Requiem for a Dream",2000],
+  ["Audiard, Jacques","De battre mon coeur s'est arrêté",2005],
+  ["Audiard, Jacques","Un prophète",2009],
+  ["Babenco, Hector","Pixote: A Lei do Mais Fraco",1981],
+  ["Barmak, Siddiq","Osama",2003],
+  ["Bay, Michael","The Rock",1996],
+  ["Benton, Robert","Kramer vs. Kramer",1979],
+  ["Bergman, Ingmar","Höstsonaten",1978],
+  ["Bergman, Ingmar","Jungfrukällan",1960],
+  ["Bergman, Ingmar","En lektion i kärlek",1954],
+  ["Bergman, Ingmar","En passion",1969],
+  ["Bergman, Ingmar","Persona",1966],
+  ["Bergman, Ingmar","Saraband",2003],
+  ["Bergman, Ingmar","Såsom i en spegel",1961],
+  ["Bergman, Ingmar","Det sjunde inseglet",1957],
+  ["Bergman, Ingmar","Skammen",1968],
+  ["Bergman, Ingmar","Smultronstället",1957],
+  ["Bergman, Ingmar","The Serpent's Egg",1977],
+  ["Bergman, Ingmar","Tystnaden",1963],
+  ["Bergman, Ingmar","Viskningar och rop",1972],
+  ["Berri, Claude","Ensemble, c'est tout",2007],
+  ["Bertolucci, Bernardo","Il conformista",1970],
+  ["Bertolucci, Bernardo","Ten Minutes Older: The Cello",2002],
+  ["Breillat, Catherine","À ma soeur!",2001],
+  ["Campion, Jane","The Piano",1993],
+  ["Cavani, Liliana","Il portiere di notte",1974],
+  ["Chéreau, Patrice","La Reine Margot",1994],
+  ["Cox, Alex","Sid and Nancy",1986],
+  ["de Heer, Rolf","Bad Boy Bubby",1993],
+  ["Dibb, Saul","The Duchess",2008],
+  ["Dolan, Xavier","Heartbeats",2010],
+  ["Dolan, Xavier","J'ai tué ma mère",2009],
+  ["Edel, Uli","Der Baader Meinhof Komplex",2008],
+  ["Fiennes, Sophie","The Pervert's Guide to Cinema",2006],
+  ["Folman, Ari","Waltz with Bashir",2008],
+  ["Frears, Stephen","Dangerous Liaisons",1988],
+  ["Frears, Stephen","Mary Reilly",1996],
+  ["Fuller, Samuel","Shock Corridor",1963],
+  ["Gallo, Vincent","Buffalo '66",1998],
+  ["Goretta, Claude","La dentellière",1977],
+  ["Guadagnino, Luca","Io sono l'amore",2009],
+  ["Hamer, Bent","Factotum",2005],
+  ["Harron, Mary","American Psycho",2000],
+  ["Ivory, James","A Room with a View",1985],
+  ["Ivory, James","Howards End",1992],
+  ["Jacquot, Benoît","Sade",2000],
+  ["Kari, Dagur","Voksne mennesker",2005],
+  ["Kechiche, Abdel","La Graine et le Mulet",2007],
+  ["Kon, Satoshi","Paprika",2006],
+  ["Laloux, René","Gandahar",1988],
+  ["Laloux, René","La planète sauvage",1973],
+  ["Lehmann, Michael","Heathers",1989],
+  ["Lelouch, Claude","Un homme et une femme",1966],
+  ["Losey, Joseph","The Servant",1963],
+  ["Malick, Terrence","Badlands",1973],
+  ["McGuigan, Paul","The Acid House",1998],
+  ["Meadows, Shane","This Is England",2006],
+  ["Monson, Shaun","Earthlings",2006],
+  ["Nuytten, Bruno","Camille Claudel",1988],
+  ["Paley, Nina","Sita Sings the Blues",2008],
+  ["Penn, Sean","Into the Wild",2007],
+  ["Potter, Sally","The Man Who Cried",2000],
+  ["Roeg, Nicolas","Bad Timing: A Sensual Obsession",1980],
+  ["Salles, Walter","Diarios de motocicleta",2004],
+  ["Sautet, Claude","Un cœur en hiver",1992],
+  ["Schlöndorff, Volker","The Handmaid's Tale",1990],
+  ["Schnabel, Julian","Le scaphandre et le papillon",2007],
+  ["Schroeder, Barbet","Barfly",1987],
+  ["Singh, Tarsem","The Fall",2006],
+  ["Skolimowski, Jerzy","Four Nights with Anna",2008],
+  ["Skolimowski, Jerzy","The Shout",1978],
+  ["Smith, Kevin","Chasing Amy",1997],
+  ["Soderbergh, Steven","Kafka",1991],
+  ["Sokurov, Aleksandr","Otets i syn",2003],
+  ["Sokurov, Aleksandr","Russkiy kovcheg",2002],
+  ["Solanas, Fernando","La Hora de los Hornos",1968],
+  ["Solondz, Todd","Welcome to the Dollhouse",1995],
+  ["Spielberg, Steven","1941",1979],
+  ["Spielberg, Steven","Catch Me If You Can",2002],
+  ["Spielberg, Steven","Duel",1971],
+  ["Spielberg, Steven","Jurassic Park",1993],
+  ["Spielberg, Steven","Munich",2005],
+  ["Spielberg, Steven","The Lost World: Jurassic Park",1997],
+  ["Švankmajer, Jan","Byt",1968],
+  ["Švankmajer, Jan","Faust",1994],
+  ["Švankmajer, Jan","Jídlo",1992],
+  ["Švankmajer, Jan","Fantasia G-moll",1965],
+  ["Švankmajer, Jan","Konec stalinismu v Čechách",1990],
+  ["Švankmajer, Jan","Kostnice",1970],
+  ["Švankmajer, Jan","Kyvadlo, jáma a naděje",1983],
+  ["Švankmajer, Jan","Něco z Alenky",1988],
+  ["Švankmajer, Jan","Poslední trik pana Schwarzewalldera",1964],
+  ["Švankmajer, Jan","Spiklenci slasti",1996],
+  ["Švankmajer, Jan","Tma / Světlo / Tma",1989],
+  ["Švankmajer, Jan","Zánik domu Usheru",1981],
+  ["Švankmajer, Jan","Žvahlav aneb Šatičky Slaměného Huberta",1971],
+  ["Sverák, Jan","Dark Blue World",2001],
+  ["Sverák, Jan","Kolja",1996],
+  ["Szabó, István","Being Julia",2004],
+  ["Taddicken, Sven","Mein Bruder, der Vampir",2001],
+  ["Tarantino, Quentin","Pulp Fiction",1994],
+  ["Tarkovsky, Andrei","Katok i skripka",1961],
+  ["Tarkovsky, Andrei","Nostalghia",1983],
+  ["Tarkovsky, Andrei","Ubiytsy",1958],
+  ["Tati, Jacques","Play Time",1967],
+  ["Taviani Kardeşleri","Le affinità elettive",1996],
+  ["Taviani Kardeşleri","Good Morning, Babylon",1987],
+  ["Taviani Kardeşleri","Kaos",1984],
+  ["Taviani Kardeşleri","La notte di San Lorenzo",1982],
+  ["Taviani Kardeşleri","Padre padrone",1977],
+  ["Taviani Kardeşleri","Resurrezione",2001],
+  ["Taviani Kardeşleri","San Michele aveva un gallo",1972],
+  ["Taviani Kardeşleri","Il sole anche di notte",1990],
+  ["Taviani Kardeşleri","Sotto il segno dello scorpione",1969],
+  ["Taviani Kardeşleri","Tu ridi",1998],
+  ["Taviani Kardeşleri","Un uomo da bruciare",1962],
+  ["Téchiné, André","Rendez-vous",1985],
+  ["Tornatore, Giuseppe","Nuovo cinema Paradiso",1988],
+  ["Del Toro, Guillermo","El laberinto del fauno",2006],
+  ["Von Trier, Lars","Antichrist",2009],
+  ["Von Trier, Lars","Dancer in the Dark",2000],
+  ["Von Trier, Lars","Europa",1991],
+  ["Von Trier, Lars","Manderlay",2005],
+  ["Truffaut, François","L'Enfant sauvage",1970],
+  ["Truffaut, François","La Peau douce",1964],
+  ["Tsui, Hark","Chat gim",2005],
+  ["Vadim, Roger","Les Liaisons dangereuses",1959],
+  ["Varda, Agnès","Cléo de 5 à 7: Souvenirs et anecdotes",2005],
+  ["Varda, Agnès","Les Glaneurs et la glaneuse",2000],
+  ["Verhoeven, Paul","Zwartboek",2006],
+  ["Vertov, Dziga","Chelovek s kino-apparatom",1929],
+  ["Vigo, Jean","À propos de Nice",1930],
+  ["Vigo, Jean","Zéro de conduite",1933],
+  ["Wachowski, Andy & Larry","The Matrix",1999],
+  ["Wachowski, Andy & Larry","The Matrix Reloaded",2003],
+  ["Wachowski, Andy & Larry","The Matrix Revolutions",2003],
+  ["Wajda, Andrzej","Ashes and Diamonds",1958],
+  ["Wajda, Andrzej","Danton",1983],
+  ["Wajda, Andrzej","Kanal",1957],
+  ["Wajda, Andrzej","Katyń",2007],
+  ["Weir, Peter","Dead Poets Society",1989],
+  ["Weir, Peter","The Truman Show",1998],
+  ["Welles, Orson","Citizen Kane",1941],
+  ["Welles, Orson","Macbeth",1948],
+  ["Welles, Orson","Touch of Evil",1958],
+  ["Wenders, Wim","Der Himmel über Berlin",1987],
+  ["Wenders, Wim","Paris, Texas",1984],
+  ["Wenders, Wim","The Soul of a Man",2003],
+  ["Whedon, Joss","Serenity",2005],
+  ["Wiene, Robert","Das Cabinet des Dr. Caligari",1920],
+  ["Wilder, Billy","Double Indemnity",1944],
+  ["Winterbottom, Michael","9 Songs",2004],
+  ["Winterbottom, Michael","Jude",1996],
+  ["Wong, Kar-wai","My Blueberry Nights",2007],
+  ["Wright, Geoffrey","Romper Stomper",1992],
+  ["Yamada, Yōji","Kakushi ken: Oni no tsume",2004],
+  ["Yamada, Yōji","Tasogare Seibei",2002],
+  ["Yamazaki, Kazuo","A Wind Named Amnesia",1993],
+  ["Zhang, Yimou","Curse of the Golden Flower",2006],
+  ["Zhang, Yimou","Da hong deng long gao gao gua",1991],
+  ["Zhang, Yimou","House of Flying Daggers",2004],
+];
+
+let sortState = { col: 0, dir: 'asc' };
+let filtered = [...data];
+
+const tbody = document.getElementById('tbody');
+const countEl = document.getElementById('count');
+const noResults = document.getElementById('noResults');
+const searchEl = document.getElementById('search');
+
+function render() {
+  tbody.innerHTML = '';
+  if (filtered.length === 0) {
+    noResults.style.display = 'block';
+    countEl.textContent = '0';
+    return;
+  }
+  noResults.style.display = 'none';
+  countEl.textContent = filtered.length;
+  filtered.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row[0]}</td><td>${row[1]}</td><td>${row[2]}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function sortData(col) {
+  if (sortState.col === col) {
+    sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortState.col = col;
+    sortState.dir = 'asc';
+  }
+  filtered.sort((a, b) => {
+    const va = a[col], vb = b[col];
+    let cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), 'tr');
+    return sortState.dir === 'asc' ? cmp : -cmp;
+  });
+  document.querySelectorAll('th').forEach((th, i) => {
+    th.classList.remove('asc', 'desc');
+    if (i === col) th.classList.add(sortState.dir);
+  });
+  render();
+}
+
+document.querySelectorAll('th').forEach(th => {
+  th.addEventListener('click', () => sortData(+th.dataset.col));
+});
+
+searchEl.addEventListener('input', () => {
+  const q = searchEl.value.toLowerCase();
+  filtered = data.filter(r => r[0].toLowerCase().includes(q) || r[1].toLowerCase().includes(q) || String(r[2]).includes(q));
+  sortData(sortState.col);
+});
+
+// Initial sort by director
+filtered.sort((a,b) => String(a[0]).localeCompare(String(b[0]),'tr'));
+document.querySelector('th[data-col="0"]').classList.add('asc');
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Projeler</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-0: #060a16;
+      --bg-1: #0f1629;
+      --accent: #4f7cff;
+      --text: #f5f5f5;
+      --text-dim: #9fb0c9;
+      --text-mute: #5e6e87;
+    }
+
+    html, body { min-height: 100%; }
+
+    body {
+      background:
+        radial-gradient(1200px 600px at 20% 0%, #1b2a4a 0%, transparent 60%),
+        radial-gradient(1000px 500px at 90% 100%, #2a1e3f 0%, transparent 55%),
+        linear-gradient(180deg, var(--bg-1) 0%, var(--bg-0) 100%);
+      color: var(--text);
+      font-family: -apple-system, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 72px 24px;
+    }
+
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    header { margin-bottom: 56px; }
+
+    .eyebrow {
+      display: inline-block;
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-mute);
+      padding: 6px 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 999px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: clamp(36px, 5vw, 56px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+      margin-bottom: 14px;
+      background: linear-gradient(180deg, #fff 0%, #b5c2d9 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .subtitle {
+      color: var(--text-dim);
+      font-size: 17px;
+      max-width: 560px;
+      line-height: 1.5;
+    }
+
+    .projects {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    .project-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      overflow: hidden;
+      text-decoration: none;
+      color: inherit;
+      transition: transform 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+    }
+    .project-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(79, 124, 255, 0.35);
+      background: rgba(255,255,255,0.06);
+    }
+
+    .card-preview {
+      position: relative;
+      aspect-ratio: 4 / 3;
+      background:
+        radial-gradient(600px 300px at 50% 120%, #2a3a5c 0%, #0f1629 70%);
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 24px 24px 0;
+    }
+    .card-preview::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 22%;
+      background: repeating-linear-gradient(
+        90deg,
+        #2c3b28 0 24px,
+        #33432f 24px 48px
+      );
+      border-top: 2px solid #556b4a;
+    }
+    .card-preview img {
+      position: relative;
+      z-index: 1;
+      max-height: 78%;
+      width: auto;
+      filter: drop-shadow(0 10px 18px rgba(0,0,0,0.5));
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      transition: transform 0.35s cubic-bezier(.34,1.56,.64,1);
+    }
+    .project-card:hover .card-preview img {
+      transform: translateY(-6px) scale(1.04);
+    }
+
+    .card-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card-tag {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .card-body h2 {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .card-body p {
+      color: var(--text-dim);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .card-cta {
+      margin-top: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .card-cta .arrow {
+      display: inline-block;
+      transition: transform 0.25s ease;
+    }
+    .project-card:hover .card-cta .arrow { transform: translateX(4px); }
+
+    /* --- Film Koleksiyonu kart varyantı --- */
+    .preview-film {
+      background: radial-gradient(600px 300px at 50% 50%, #1a1a1a 0%, #0d0d0d 80%);
+      padding: 0;
+      align-items: stretch;
+      justify-content: space-between;
+      flex-direction: column;
+    }
+    .preview-film::after { display: none; }
+
+    .film-stripe {
+      height: 14%;
+      background:
+        repeating-linear-gradient(
+          90deg,
+          transparent 0 18px,
+          rgba(200,169,110,0.18) 18px 22px,
+          transparent 22px 40px
+        ),
+        #0a0a0a;
+      border-block: 1px solid #1f1f1f;
+    }
+
+    .film-mark {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .film-n {
+      font-family: 'DM Serif Display', Georgia, serif;
+      font-size: clamp(42px, 6vw, 64px);
+      color: #c8a96e;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .film-label {
+      font-family: 'SF Mono', Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: #7a7466;
+    }
+
+    .film-card:hover { border-color: rgba(200,169,110,0.4); }
+    .film-card .card-cta { color: #f1e4c9; }
+
+    footer {
+      margin-top: 72px;
+      color: var(--text-mute);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <span class="eyebrow">Deneyler</span>
+      <h1>Projeler</h1>
+      <p class="subtitle">Etkileşimli demo'lar ve küçük deneyler. Hepsi tarayıcıda, kurulumsuz.</p>
+    </header>
+
+    <div class="projects">
+      <a href="karakter.html" class="project-card">
+        <div class="card-preview">
+          <img src="images/drag-drop/020.png" alt="Karakter" />
+        </div>
+        <div class="card-body">
+          <span class="card-tag">Pixel Art · Etkileşim</span>
+          <h2>Karakter</h2>
+          <p>Pixel-art karakteri kafa ve omzundan tutup sahnedeki butonların üzerine taşı. Düşüş, sekme, idle ve konuşma balonu animasyonlarıyla.</p>
+          <span class="card-cta">Demoyu aç <span class="arrow">→</span></span>
+        </div>
+      </a>
+
+      <a href="film-koleksiyonu.html" class="project-card film-card">
+        <div class="card-preview preview-film">
+          <div class="film-stripe"></div>
+          <div class="film-mark">
+            <span class="film-n">N° 01</span>
+            <span class="film-label">Koleksiyon</span>
+          </div>
+          <div class="film-stripe"></div>
+        </div>
+        <div class="card-body">
+          <span class="card-tag">Arşiv · Liste</span>
+          <h2>Film Koleksiyonu</h2>
+          <p>İzlenmiş ve izlenecek filmlerin minimal bir arşivi. Katalog tadında, koyu tema, serif başlıklar.</p>
+          <span class="card-cta">Koleksiyona git <span class="arrow">→</span></span>
+        </div>
+      </a>
+    </div>
+
+    <footer>
+      © emreacar
+    </footer>
+  </div>
+</body>
+</html>
