@@ -216,6 +216,78 @@
       100% { opacity: 0;    transform: translate(var(--dx), var(--dy)) scale(1.4); }
     }
 
+    /* --- Şimşek / canavar gölgesi ------------------------------------- */
+    .lightning-flash {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 50% 30%, rgba(230,240,255,0.95) 0%, rgba(200,220,255,0.7) 35%, rgba(255,255,255,0) 75%);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 50;
+      mix-blend-mode: screen;
+    }
+    .lightning-flash.flash {
+      animation: lightningFlash 0.95s ease-out;
+    }
+    @keyframes lightningFlash {
+      0%   { opacity: 0; }
+      6%   { opacity: 1; }
+      14%  { opacity: 0.2; }
+      22%  { opacity: 0.85; }
+      40%  { opacity: 0.08; }
+      55%  { opacity: 0.5; }
+      100% { opacity: 0; }
+    }
+
+    .lightning-bolt {
+      position: absolute;
+      top: -4%;
+      width: 60px;
+      height: 50vh;
+      pointer-events: none;
+      z-index: 51;
+      opacity: 0;
+      filter: drop-shadow(0 0 10px rgba(180,210,255,0.95))
+              drop-shadow(0 0 30px rgba(120,160,255,0.6));
+    }
+    .lightning-bolt.flash {
+      animation: boltFlash 0.95s ease-out;
+    }
+    @keyframes boltFlash {
+      0%, 100% { opacity: 0; }
+      4%, 10%  { opacity: 1; }
+      12%      { opacity: 0; }
+      18%, 24% { opacity: 1; }
+      30%      { opacity: 0; }
+    }
+
+    .monster-shadow {
+      position: absolute;
+      bottom: 22%;           /* zemin seviyesi */
+      left: 50%;             /* JS'ten karakter ayağına hizalanır */
+      width: 560px;
+      height: auto;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 0;
+      /* PNG'nin sağ-alt köşesi = canavarın kuyruk-ucu — karakter ayağına sabitle */
+      transform-origin: 100% 100%;
+      transform: scale(1.0);
+    }
+    .monster-shadow.flash {
+      animation: monsterShadowFlash 0.95s ease-out;
+    }
+    @keyframes monsterShadowFlash {
+      0%, 100% { opacity: 0; }
+      6%, 10%  { opacity: 0.88; }
+      14%      { opacity: 0.15; }
+      22%, 28% { opacity: 0.92; }
+      40%      { opacity: 0.1; }
+      55%      { opacity: 0.55; }
+      80%      { opacity: 0; }
+    }
+
     .platform {
       position: absolute;
       transform: translate(-50%, -50%);
@@ -294,12 +366,25 @@
   <div class="stage" id="stage">
     <div class="ground"></div>
 
+    <img class="monster-shadow" id="monsterShadow" src="images/effects/monster-shadow.png" alt="" />
+
+    <svg class="lightning-bolt" id="lightningBolt" viewBox="0 0 60 500" preserveAspectRatio="none">
+      <polyline points="30,0 24,110 42,120 16,260 34,270 10,420 28,430 18,500"
+                fill="none" stroke="#eaf2ff" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" />
+      <polyline points="30,0 24,110 42,120 16,260 34,270 10,420 28,430 18,500"
+                fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
+    </svg>
+
+    <div class="lightning-flash" id="lightningFlash"></div>
+
+    <audio id="thunderAudio" src="sounds/thunder.mp3" preload="auto"></audio>
+
     <div class="hint">
       <h1>Karakteri tut ve bırak</h1>
       <p>Fareyle üzerine gel, tıklayıp sürükle, bırak — yer çeker.</p>
     </div>
 
-    <button class="platform pos-left variant-pink"  type="button">BAŞLAT</button>
+    <button class="platform pos-left variant-pink" id="btnBaslat" type="button">BAŞLAT</button>
     <button class="platform pos-mid"                 type="button">BENİ TUT</button>
     <button class="platform pos-right variant-green" type="button">BIRAK</button>
 
@@ -327,6 +412,10 @@
       const char      = document.getElementById('char');
       const grab      = document.getElementById('grab');
       const bubble    = document.getElementById('bubble');
+      const flashEl   = document.getElementById('lightningFlash');
+      const boltEl    = document.getElementById('lightningBolt');
+      const monsterEl = document.getElementById('monsterShadow');
+      const thunder   = document.getElementById('thunderAudio');
       const platforms = () => document.querySelectorAll('.platform');
       const sprites = {
         idle:     document.getElementById('spr-idle'),
@@ -436,6 +525,8 @@
         char.style.left = (x - state.w / 2) + 'px';
         char.style.top  = (y - state.h / 2) + 'px';
         char.style.transform = 'none'; // translateX(-50%) artık gerek yok
+        // canavarın sağ-alt köşesi karakterin ayağına gelsin
+        monsterEl.style.left = (x - monsterEl.offsetWidth) + 'px';
       }
 
       function initPosition() {
@@ -642,6 +733,44 @@
 
       bumpActivity();
       setTimeout(() => showSpeech('Merhaba!', 2800, 0), 600);
+
+      // --- Şimşek + canavar gölgesi -------------------------------------
+      const LIGHTNING_MIN_MS = 12000;  // en erken 12 sn sonra yeni çakış
+      const LIGHTNING_MAX_MS = 35000;  // en geç 35 sn
+
+      function triggerLightning() {
+        // bolt'u rastgele bir konuma yerleştir
+        const W = window.innerWidth;
+        const boltX = randInt(W * 0.1, W * 0.9);
+        boltEl.style.left = (boltX - 30) + 'px';
+
+        // Flash + bolt + gölge — hepsi aynı anda
+        [flashEl, boltEl, monsterEl].forEach(el => {
+          el.classList.remove('flash');
+          void el.offsetWidth; // reflow — animasyonu sıfırla
+          el.classList.add('flash');
+        });
+
+        // Gök gürültüsü (tarayıcı izin verirse)
+        try {
+          thunder.currentTime = 0;
+          thunder.volume = 0.85;
+          thunder.play().catch(() => {});
+        } catch (_) {}
+
+        setTimeout(() => {
+          [flashEl, boltEl, monsterEl].forEach(el => el.classList.remove('flash'));
+        }, 1000);
+      }
+
+      function scheduleLightning() {
+        const wait = randInt(LIGHTNING_MIN_MS, LIGHTNING_MAX_MS);
+        setTimeout(() => {
+          triggerLightning();
+          scheduleLightning();
+        }, wait);
+      }
+      scheduleLightning();
 
       window.addEventListener('resize', () => {
         if (state.mode === 'idle' || state.mode === 'hover') initPosition();
