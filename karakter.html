@@ -90,6 +90,7 @@
       height: 32%;
       cursor: grab;
       pointer-events: auto;
+      touch-action: none;
       z-index: 3;
     }
     .character.dragging .grab-handle { cursor: grabbing; }
@@ -459,39 +460,48 @@
         speechTimer = setTimeout(() => bubble.classList.remove('visible'), duration);
       }
 
-      // --- Hover (sadece tutma alanında)
-      grab.addEventListener('mouseenter', () => {
+      // --- Hover (sadece mouse için; touch cihazlarında hover yok)
+      grab.addEventListener('pointerenter', (e) => {
+        if (e.pointerType !== 'mouse') return;
         bumpActivity();
         if (state.mode === 'idle') setMode('hover');
         showSpeech('Merhaba!');
       });
-      document.addEventListener('pointerdown', bumpActivity);
-      document.addEventListener('pointerup',   bumpActivity);
-      grab.addEventListener('mouseleave', () => {
+      grab.addEventListener('pointerleave', (e) => {
+        if (e.pointerType !== 'mouse') return;
         if (state.mode === 'hover') setMode('idle');
       });
+      document.addEventListener('pointerdown', bumpActivity);
+      document.addEventListener('pointerup',   bumpActivity);
 
-      // --- Drag başlat (sadece tutma alanında)
-      grab.addEventListener('mousedown', (e) => {
+      // --- Drag başlat (mouse + touch + pen)
+      grab.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return; // sadece sol tık
         e.preventDefault();
         if (state.raf) { cancelAnimationFrame(state.raf); state.raf = null; }
         measure();
         state.dragging = true;
+        state.pointerId = e.pointerId;
         state.grabOffsetX = e.clientX - state.x;
         state.grabOffsetY = e.clientY - state.y;
+        lastX = e.clientX - state.grabOffsetX;
+        lastY = e.clientY - state.grabOffsetY;
+        lastT = performance.now();
+        state.vx = 0; state.vy = 0;
+        try { grab.setPointerCapture(e.pointerId); } catch (_) {}
         setMode('drag');
       });
 
       // --- Sürükleme & hız takibi
       let lastX = 0, lastY = 0, lastT = 0;
-      window.addEventListener('mousemove', (e) => {
-        if (!state.dragging) return;
+      window.addEventListener('pointermove', (e) => {
+        if (!state.dragging || e.pointerId !== state.pointerId) return;
         const nx = e.clientX - state.grabOffsetX;
         const ny = e.clientY - state.grabOffsetY;
 
         const now = performance.now();
         const dt = Math.max(1, now - lastT);
-        state.vx = ((nx - lastX) / dt) * 16; // ~frame bazlı
+        state.vx = ((nx - lastX) / dt) * 16;
         state.vy = ((ny - lastY) / dt) * 16;
         lastX = nx; lastY = ny; lastT = now;
 
@@ -499,15 +509,18 @@
       });
 
       // --- Bırak → düşüş
-      window.addEventListener('mouseup', () => {
+      function endDrag(e) {
         if (!state.dragging) return;
+        if (e && e.pointerId !== undefined && e.pointerId !== state.pointerId) return;
         state.dragging = false;
-        // hız cap
+        try { grab.releasePointerCapture(state.pointerId); } catch (_) {}
         state.vx = Math.max(-MAX_V, Math.min(MAX_V, state.vx));
         state.vy = Math.max(-MAX_V, Math.min(MAX_V, state.vy));
         setMode('fall');
         startPhysics();
-      });
+      }
+      window.addEventListener('pointerup',     endDrag);
+      window.addEventListener('pointercancel', endDrag);
 
       function getPlatformList() {
         return [...platforms()].map(el => {
