@@ -220,6 +220,41 @@
     .film-card:hover { border-color: rgba(200,169,110,0.4); }
     .film-card .card-cta { color: #f1e4c9; }
 
+    /* --- VidScale kart varyantı --- */
+    .preview-vid {
+      padding: 0;
+      align-items: stretch;
+      justify-content: stretch;
+      background: #161616;
+    }
+    .preview-vid::after { display: none; }
+    .vid-shot {
+      position: relative;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      max-height: none;
+      filter: none;
+      image-rendering: auto;
+      transition: transform 0.5s cubic-bezier(.34,1.4,.64,1);
+    }
+    .project-card:hover .card-preview .vid-shot { transform: scale(1.04); }
+    .vid-badge {
+      position: absolute;
+      top: 16px; right: 16px;
+      font-family: 'SF Mono', Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #9fb0c9;
+      padding: 4px 9px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 999px;
+      background: rgba(0,0,0,0.25);
+    }
+
     footer {
       margin-top: 72px;
       color: var(--text-mute);
@@ -233,10 +268,36 @@
     <header>
       <span class="eyebrow">Deneyler</span>
       <h1>Projeler</h1>
-      <p class="subtitle">Etkileşimli demo'lar ve küçük deneyler. Hepsi tarayıcıda, kurulumsuz.</p>
+      <p class="subtitle">Etkileşimli tarayıcı demo'ları ve küçük araçlar. Bir kısmı kurulumsuz, bir kısmı masaüstü.</p>
     </header>
 
     <div class="projects">
+      <a href="videoloop.html" class="project-card">
+        <div class="card-preview preview-vid">
+          <span class="vid-badge">macOS</span>
+          <img class="vid-shot" src="images/videoloop-screenshot.png" alt="VideoLoop" />
+        </div>
+        <div class="card-body">
+          <span class="card-tag">macOS · ffmpeg</span>
+          <h2>VideoLoop</h2>
+          <p>Bir videoyu kusursuz döngüye çeviren native macOS uygulaması. Auto, Crossfade, Boomerang ve Swap modları; sürükle-bırak, anlık önizleme.</p>
+          <span class="card-cta">Detaya git <span class="arrow">→</span></span>
+        </div>
+      </a>
+
+      <a href="vidscale.html" class="project-card">
+        <div class="card-preview preview-vid">
+          <span class="vid-badge">macOS</span>
+          <img class="vid-shot" src="images/vidscale-screenshot.png" alt="VidScale" />
+        </div>
+        <div class="card-body">
+          <span class="card-tag">macOS · ffmpeg</span>
+          <h2>VidScale</h2>
+          <p>Videoları çözünürlük merdiveninde (240p–1080p) toplu küçülten native macOS uygulaması. Sürükle-bırak, dosya başına canlı ilerleme, ffmpeg motoru.</p>
+          <span class="card-cta">Detaya git <span class="arrow">→</span></span>
+        </div>
+      </a>
+
       <a href="karakter.html" class="project-card">
         <div class="card-preview">
           <img src="images/drag-drop/020.png" alt="Karakter" />
